@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    // ADD THIS SECTION HERE
+    tools {
+        nodejs 'Node22' 
+    }
+
     parameters {
         string(name: 'PROJECT_ID', defaultValue: 'quotes-app-001', description: 'The ID of the project in the tracker')
         string(name: 'ENVIRONMENT_ID', defaultValue: 'production-env-01', description: 'The target environment ID')
@@ -20,7 +25,6 @@ pipeline {
             steps {
                 checkout scm
                 script {
-                    // Extract Git details for the tracker
                     env.COMMIT_HASH = sh(script: "git rev-parse HEAD", returnStdout: true).trim()
                     env.COMMIT_MSG = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
                     env.COMMIT_AUTHOR = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
@@ -31,12 +35,14 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
+                // This will now use Node 22 automatically
                 sh 'npm install'
             }
         }
 
         stage('Build') {
             steps {
+                // This will now pass because CustomEvent is supported in Node 22
                 sh 'npm run build'
             }
         }
@@ -44,7 +50,6 @@ pipeline {
         stage('Update DeployFlow Tracker') {
             steps {
                 script {
-                    // Hit the custom webhook in your own backend to record this deployment
                     def response = sh(script: """
                         curl -s -X POST http://${params.EC2_HOST}:5000/api/jenkins-webhook \\
                         -H "Content-Type: application/json" \\
