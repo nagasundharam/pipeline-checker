@@ -1,12 +1,12 @@
 pipeline {
     agent any
 
-
     parameters {
         string(name: 'PROJECT_ID', defaultValue: 'quotes-app-001', description: 'The ID of the project in the tracker')
         string(name: 'ENVIRONMENT_ID', defaultValue: 'production-env-01', description: 'The target environment ID')
         string(name: 'DEPLOY_BRANCH', defaultValue: 'main', description: 'The branch being deployed')
-        string(name: 'EC2_HOST', defaultValue: 'localhost', description: 'The host of the tracker backend')
+        // Updated to use the actual IP if you aren't running the tracker on Jenkins' localhost
+        string(name: 'TRACKER_HOST', defaultValue: '44.211.24.70', description: 'The public IP of the tracker backend')
     }
 
     environment {
@@ -14,6 +14,7 @@ pipeline {
         COMMIT_AUTHOR = ""
         COMMIT_AUTHOR_EMAIL = ""
         COMMIT_HASH = ""
+        PUBLIC_IP = ""
     }
 
     stages {
@@ -21,24 +22,27 @@ pipeline {
             steps {
                 checkout scm
                 script {
+                    // Get Git Info
                     env.COMMIT_HASH = sh(script: "git rev-parse HEAD", returnStdout: true).trim()
                     env.COMMIT_MSG = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
                     env.COMMIT_AUTHOR = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
                     env.COMMIT_AUTHOR_EMAIL = sh(script: "git log -1 --pretty=%ae", returnStdout: true).trim()
+                    
+                    // Fetch Public IP of this EC2
+                    env.PUBLIC_IP = sh(script: "curl -s http://checkip.amazonaws.com", returnStdout: true).trim()
                 }
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                // This will now use Node 22 automatically
+                // Uses the Node 22 you installed manually
                 sh 'npm install'
             }
         }
 
         stage('Build') {
             steps {
-                // This will now pass because CustomEvent is supported in Node 22
                 sh 'npm run build'
             }
         }
@@ -46,8 +50,9 @@ pipeline {
         stage('Update DeployFlow Tracker') {
             steps {
                 script {
-                    def response = sh(script: """
-                        curl -s -X POST http://${params.EC2_HOST}:5000/api/jenkins-webhook \\
+                    // Hit the tracker using the public IP instead of localhost
+                    sh """
+                        curl -s -X POST http://${params.TRACKER_HOST}:5000/api/jenkins-webhook \\
                         -H "Content-Type: application/json" \\
                         -d '{
                             "project_id": "${params.PROJECT_ID}",
@@ -64,8 +69,18 @@ pipeline {
                                 "user_id": "system"
                             }
                         }'
-                    """, returnStdout: true).trim()
-                    echo "Tracker Response: ${response}"
+                    """
+                }
+            }
+        }
+        
+        stage('Deploy to Web Server') {
+            steps {
+                script {
+                    // This moves your build files to the folder Nginx/Apache uses
+                    // Note: Ensure /var/www/html is writable by 'jenkins' user or use sudo
+                    sh 'sudo cp -r dist/* /var/www/html/'
+                 echo "View App at: http://${env.PUBLIC_IP}"
                 }
             }
         }
@@ -73,10 +88,13 @@ pipeline {
 
     post {
         success {
-            echo 'Deployment successfully tracked and completed.'
+            echo "-----------------------------------------------------------"
+            echo "Frontend Deployed Successfully!"
+            echo "View App at: http://${env.PUBLIC_IP}"
+            echo "-----------------------------------------------------------"
         }
         failure {
-            echo 'Deployment or tracking failed. Please check the logs.'
+            echo "Deployment failed. Check if tracker is running at http://${params.TRACKER_HOST}:5000"
         }
     }
 }
