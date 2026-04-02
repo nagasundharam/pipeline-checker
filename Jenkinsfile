@@ -2,27 +2,32 @@ pipeline {
     agent any
 
     parameters {
-        string(name: 'PROJECT_ID', defaultValue: 'quotes-app-001', description: 'The ID of the project')
-        string(name: 'ENVIRONMENT_ID', defaultValue: 'production-env-01', description: 'The target environment')
+        // Replace defaultValue with the REAL IDs from the Tracker UI's "Jenkins configuration" card
+        string(name: 'PROJECT_ID', defaultValue: '69ce6897557b3606c5b165ec', description: 'The unique ID of the project in the tracker')
+        string(name: 'ENVIRONMENT_ID', defaultValue: '69ce68b3557b3606c5b165fb', description: 'The target environment ID')
         string(name: 'DEPLOY_BRANCH', defaultValue: 'main', description: 'The branch being deployed')
-        string(name: 'EC2_HOST', defaultValue: 'localhost', description: 'The host of the tracker backend')
+        string(name: 'EC2_HOST', defaultValue: '34.204.195.105', description: 'The IP/Host of your Deployment Tracker backend')
     }
 
     environment {
         COMMIT_HASH = ""
         COMMIT_MSG = ""
         COMMIT_AUTHOR = ""
+        COMMIT_EMAIL = ""
         PUBLIC_IP = ""
     }
 
     stages {
         stage('Checkout & Metadata') {
             steps {
+                // Pulls code and extracts Git info
                 checkout scm
                 script {
-                    env.COMMIT_HASH = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+                    env.COMMIT_HASH = sh(script: "git rev-parse HEAD", returnStdout: true).trim()
                     env.COMMIT_MSG = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
                     env.COMMIT_AUTHOR = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
+                    env.COMMIT_EMAIL = sh(script: "git log -1 --pretty=%ae", returnStdout: true).trim()
+                    // Optional: Get IP if you want to show it in logs
                     env.PUBLIC_IP = sh(script: "curl -s http://checkip.amazonaws.com", returnStdout: true).trim()
                 }
             }
@@ -37,16 +42,16 @@ pipeline {
 
         stage('Deploy Frontend') {
             steps {
-                // Moving files to Nginx folder so the app is live
+                // Replace with your actual deployment command (e.g., cp to /var/www/html or docker push)
                 sh 'cp -r dist/* /var/www/html/'
-                echo "App is now live at http://${env.PUBLIC_IP}"
+                echo "Deployment finished. App is live at http://${env.PUBLIC_IP}"
             }
         }
 
         stage('Update Tracker API') {
             steps {
                 script {
-                    // This runs AFTER the app is already live
+                    echo "Notifying Deployment Tracker..."
                     try {
                         sh """
                             curl -s -X POST http://${params.EC2_HOST}:5000/api/jenkins-webhook \\
@@ -55,14 +60,22 @@ pipeline {
                                 "project_id": "${params.PROJECT_ID}",
                                 "environment_id": "${params.ENVIRONMENT_ID}",
                                 "pipeline_id": "${env.BUILD_NUMBER}",
-                                "version": "${env.COMMIT_HASH}",
+                                "version": "1.0.${env.BUILD_NUMBER}",
                                 "branch": "${params.DEPLOY_BRANCH}",
                                 "commit_message": "${env.COMMIT_MSG}",
-                                "commit_author": "${env.COMMIT_AUTHOR}"
+                                "commit_author": "${env.COMMIT_AUTHOR}",
+                                "commit_author_email": "${env.COMMIT_EMAIL}",
+                                "commit_hash": "${env.COMMIT_HASH}",
+                                "triggered_by": {
+                                    "username": "Jenkins",
+                                    "user_id": "system"
+                                }
                             }'
                         """
+                        echo "Tracker API updated successfully!"
                     } catch (Exception e) {
-                        echo "Tracker API call failed, but frontend is already deployed!"
+                        echo "Warning: Tracker API update failed, but deployment is already live."
+                        echo "Error: ${e.message}"
                     }
                 }
             }
@@ -75,6 +88,9 @@ pipeline {
             echo "DEPLOYMENT COMPLETE"
             echo "URL: http://${env.PUBLIC_IP}"
             echo "-----------------------------------------------------------"
+        }
+        failure {
+            echo "DEPLOYMENT FAILED: Check the build console for errors."
         }
     }
 }
