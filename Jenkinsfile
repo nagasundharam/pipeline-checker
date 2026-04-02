@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-    // ADD THIS SECTION HERE
-    tools {
-        nodejs 'Node22' 
-    }
 
     parameters {
         string(name: 'PROJECT_ID', defaultValue: 'quotes-app-001', description: 'The ID of the project in the tracker')
