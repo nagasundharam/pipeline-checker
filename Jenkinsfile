@@ -11,18 +11,28 @@ pipeline {
     }
 
     environment {
+        // Robust fallback for the API host
+        DEFAULT_API_HOST = '34.204.195.105'
+        TRACKER_PORT = '5000'
+        
         COMMIT_HASH = ""
         COMMIT_MSG = ""
         COMMIT_AUTHOR = ""
         COMMIT_EMAIL = ""
         PUBLIC_IP = ""
-        VITE_API_URL = "http://${params.EC2_HOST}:5000/api"
+        VITE_API_URL = "" // Initialized securely in script
     }
 
     stages {
         stage('Initialize Tracker') {
             steps {
                 script {
+                    echo "Configuring Tracker API Endpoint..."
+                    // Safely evaluate apiHost to avoid empty host error
+                    def apiHost = (params.EC2_HOST && params.EC2_HOST != "") ? params.EC2_HOST : env.DEFAULT_API_HOST
+                    env.VITE_API_URL = "http://${apiHost}:${env.TRACKER_PORT}/api"
+                    echo "Final Tracker URL: ${env.VITE_API_URL}"
+
                     echo "Extracting Git Metadata..."
                     checkout scm
                     env.COMMIT_HASH = sh(script: "git rev-parse HEAD", returnStdout: true).trim()
@@ -56,11 +66,11 @@ pipeline {
                     
                     def response = sh(script: "curl -s -X POST ${env.VITE_API_URL}/jenkins-webhook -H 'Content-Type: application/json' -d @initial_payload.json", returnStdout: true)
                     
-                    // Extract DEPLOYMENT_ID from the response
+                    // Use grep as a robust fallback for parsing the ID from the JSON response
                     env.DEPLOYMENT_ID = sh(script: "echo '${response}' | grep -oP '\"_id\":\"\\K[^\"]+' | head -1", returnStdout: true).trim()
                     
-                    if (!env.DEPLOYMENT_ID) {
-                        echo "WARNING: Failed to capture DEPLOYMENT_ID. Response: ${response}"
+                    if (!env.DEPLOYMENT_ID || env.DEPLOYMENT_ID == "") {
+                        echo "WARNING: Failed to capture DEPLOYMENT_ID. Pipeline will continue without live tracking."
                     } else {
                         echo "Tracker Initialized. Deployment ID: ${env.DEPLOYMENT_ID}"
                     }
@@ -83,7 +93,7 @@ pipeline {
             steps {
                 script {
                     notifyStage("Deploy Frontend", "running")
-                    // Example deployment command (update to match your server setup)
+                    // Updated to ensure directory exists before copy
                     sh "mkdir -p /tmp/dist && cp -r dist/* /tmp/dist/"
                     echo "Deployment finished. App is live at http://${env.PUBLIC_IP}"
                     notifyStage("Deploy Frontend", "success")
@@ -95,7 +105,7 @@ pipeline {
     post {
         success {
             script {
-                if (env.DEPLOYMENT_ID) {
+                if (env.DEPLOYMENT_ID && env.DEPLOYMENT_ID != "") {
                     sh "curl -s -X PATCH ${env.VITE_API_URL}/deployments/${env.DEPLOYMENT_ID}/status -H 'Content-Type: application/json' -d '{\"status\": \"success\"}'"
                 }
             }
@@ -106,18 +116,18 @@ pipeline {
         }
         failure {
             script {
-                if (env.DEPLOYMENT_ID) {
+                if (env.DEPLOYMENT_ID && env.DEPLOYMENT_ID != "") {
                     sh "curl -s -X PATCH ${env.VITE_API_URL}/deployments/${env.DEPLOYMENT_ID}/status -H 'Content-Type: application/json' -d '{\"status\": \"failed\"}'"
                 }
             }
-            echo "DEPLOYMENT FAILED: Check the build console for errors."
+            echo "DEPLOYMENT FAILED: Check terminal output."
         }
     }
 }
 
 // Helper function defined OUTSIDE the pipeline block
 def notifyStage(String name, String status) {
-    if (env.DEPLOYMENT_ID) {
+    if (env.DEPLOYMENT_ID && env.DEPLOYMENT_ID != "") {
         echo "Notifying Tracker: ${name} -> ${status}"
         def stagePayload = [
             stageName: name,
