@@ -1,3 +1,4 @@
+import groovy.json.JsonOutput
 pipeline {
     agent any
 
@@ -47,7 +48,7 @@ pipeline {
                 echo "Deployment finished. App is live at http://${env.PUBLIC_IP}"
             }
         }
-        import groovy.json.JsonOutput
+        
 
 stage('Update Tracker API') {
     steps {
