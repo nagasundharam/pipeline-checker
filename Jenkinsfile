@@ -68,9 +68,11 @@ stage('Update Tracker API') {
                 commit_hash: env.COMMIT_HASH,
                 triggered_by: [
                     username: "Jenkins",
-                    user_id: "system"
+                    user_id: "system",
+                    source: "Jenkins" // Change this to "Jenkins" (Capital J) or "web" depending on your schema
                 ]
-            ]
+        ]
+           
 
             // 2. Convert to JSON string and write to file using built-in steps
             def jsonString = JsonOutput.toJson(payload)
