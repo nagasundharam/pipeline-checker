@@ -49,37 +49,46 @@ pipeline {
         }
 
         stage('Update Tracker API') {
-            steps {
-                script {
-                    echo "Notifying Deployment Tracker..."
-                    try {
-                        sh """
-                            curl -s -X POST http://${params.EC2_HOST}:5000/api/jenkins-webhook \\
-                            -H "Content-Type: application/json" \\
-                            -d '{
-                                "project_id": "${params.PROJECT_ID}",
-                                "environment_id": "${params.ENVIRONMENT_ID}",
-                                "pipeline_id": "${env.BUILD_NUMBER}",
-                                "version": "1.0.${env.BUILD_NUMBER}",
-                                "branch": "${params.DEPLOY_BRANCH}",
-                                "commit_message": "${env.COMMIT_MSG}",
-                                "commit_author": "${env.COMMIT_AUTHOR}",
-                                "commit_author_email": "${env.COMMIT_EMAIL}",
-                                "commit_hash": "${env.COMMIT_HASH}",
-                                "triggered_by": {
-                                    "username": "Jenkins",
-                                    "user_id": "system"
-                                }
-                            }'
-                        """
-                        echo "Tracker API updated successfully!"
-                    } catch (Exception e) {
-                        echo "Warning: Tracker API update failed, but deployment is already live."
-                        echo "Error: ${e.message}"
-                    }
-                }
+    steps {
+        script {
+            echo "Notifying Deployment Tracker..."
+            
+            // 1. Create a Map of your data
+            def payload = [
+                project_id: params.PROJECT_ID,
+                environment_id: params.ENVIRONMENT_ID,
+                pipeline_id: env.BUILD_NUMBER,
+                version: "1.0.${env.BUILD_NUMBER}",
+                branch: params.DEPLOY_BRANCH,
+                commit_message: env.COMMIT_MSG,
+                commit_author: env.COMMIT_AUTHOR,
+                commit_author_email: env.COMMIT_EMAIL,
+                commit_hash: env.COMMIT_HASH,
+                triggered_by: [
+                    username: "Jenkins",
+                    user_id: "system"
+                ]
+            ]
+
+            // 2. Convert to JSON string using Groovy's native helper
+            // Note: This requires the 'Pipeline Utility Steps' plugin (standard in most Jenkins)
+            writeJSON file: 'payload.json', json: payload
+
+            try {
+                // 3. Use @filename to send the JSON safely
+                sh "curl -s -X POST http://${params.EC2_HOST}:5000/api/jenkins-webhook \
+                    -H 'Content-Type: application/json' \
+                    -d @payload.json"
+                
+                echo "Tracker API updated successfully!"
+            } catch (Exception e) {
+                echo "Warning: Tracker API update failed. Error: ${e.message}"
+            } finally {
+                sh "rm -f payload.json" // Cleanup
             }
         }
+    }
+}
     }
 
     post {
