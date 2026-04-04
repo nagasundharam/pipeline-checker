@@ -47,13 +47,14 @@ pipeline {
                 echo "Deployment finished. App is live at http://${env.PUBLIC_IP}"
             }
         }
+        import groovy.json.JsonOutput
 
-        stage('Update Tracker API') {
+stage('Update Tracker API') {
     steps {
         script {
             echo "Notifying Deployment Tracker..."
             
-            // 1. Create a Map of your data
+            // 1. Define the data map
             def payload = [
                 project_id: params.PROJECT_ID,
                 environment_id: params.ENVIRONMENT_ID,
@@ -70,12 +71,12 @@ pipeline {
                 ]
             ]
 
-            // 2. Convert to JSON string using Groovy's native helper
-            // Note: This requires the 'Pipeline Utility Steps' plugin (standard in most Jenkins)
-            writeJSON file: 'payload.json', json: payload
+            // 2. Convert to JSON string and write to file using built-in steps
+            def jsonString = JsonOutput.toJson(payload)
+            writeFile file: 'payload.json', text: jsonString
 
             try {
-                // 3. Use @filename to send the JSON safely
+                // 3. Send the file via curl
                 sh "curl -s -X POST http://${params.EC2_HOST}:5000/api/jenkins-webhook \
                     -H 'Content-Type: application/json' \
                     -d @payload.json"
@@ -84,11 +85,14 @@ pipeline {
             } catch (Exception e) {
                 echo "Warning: Tracker API update failed. Error: ${e.message}"
             } finally {
-                sh "rm -f payload.json" // Cleanup
+                // Cleanup the temp file
+                sh "rm -f payload.json"
             }
         }
     }
 }
+
+     
     }
 
     post {
