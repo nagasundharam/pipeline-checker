@@ -20,22 +20,26 @@ pipeline {
                 script {
                     checkout scm
                     def publicIp = sh(script: "curl -s http://checkip.amazonaws.com", returnStdout: true).trim()
-                    
-                    def payload = [
-                        project_id: params.PROJECT_ID,
-                        environment_id: params.ENVIRONMENT_ID,
-                        pipeline_id: env.BUILD_NUMBER,
-                        version: "1.0.${env.BUILD_NUMBER}",
-                        branch: "main",
-                        commit_message: sh(script: "git log -1 --pretty=%B", returnStdout: true).trim(),
-                        commit_author: sh(script: "git log -1 --pretty=%an", returnStdout: true).trim(),
-                        public_url: "http://${publicIp}",
-                        stages: [
-                            [name: "Initialize Tracker", status: "pending"],
-                            [name: "Install & Build", status: "pending"],
-                            [name: "Deploy Frontend", status: "pending"]
-                        ]
-                    ]
+                   def payload = [
+    project_id: params.PROJECT_ID,
+    environment_id: params.ENVIRONMENT_ID,
+    pipeline_id: env.BUILD_NUMBER,
+    version: "1.0.${env.BUILD_NUMBER}",
+    branch: "main",
+    commit_message: sh(script: "git log -1 --pretty=%B", returnStdout: true).trim(),
+    commit_author: sh(script: "git log -1 --pretty=%an", returnStdout: true).trim(),
+    public_url: "http://${publicIp}",
+    // This is the part that was failing:
+    triggered_by: [
+        username: sh(script: "git log -1 --pretty=%an", returnStdout: true).trim(),
+        source: "jenkins" // This is mandatory for your backend
+    ],
+    stages: [
+        [name: "Initialize Tracker", status: "pending"],
+        [name: "Install & Build", status: "pending"],
+        [name: "Deploy Frontend", status: "pending"]
+    ]
+]
 
                     writeFile file: 'initial_payload.json', text: JsonOutput.toJson(payload)
                     
@@ -85,7 +89,8 @@ pipeline {
 
 def notifyStage(String name, String status) {
     // Accessing env.DEPLOYMENT_ID directly
-    if (env.DEPLOYMENT_ID && env.DEPLOYMENT_ID != "") {
+    if (env.DEPLOYMENT_ID && en
+                    v.DEPLOYMENT_ID != "") {
         def stagePayload = [stageName: name, status: status]
         writeFile file: "stage_data.json", text: JsonOutput.toJson(stagePayload)
         sh "curl -s -X PATCH ${env.VITE_API_URL}/deployments/${env.DEPLOYMENT_ID}/stage -H 'Content-Type: application/json' -d @stage_data.json"
