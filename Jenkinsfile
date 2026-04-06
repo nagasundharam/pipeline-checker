@@ -10,7 +10,6 @@ pipeline {
 
     environment {
         VITE_API_URL = "http://${params.EC2_HOST}:5000/api"
-        // Initialize as empty string
         DEPLOYMENT_ID = "" 
     }
 
@@ -19,34 +18,34 @@ pipeline {
             steps {
                 script {
                     checkout scm
+                    // 1. Capture IP first to avoid "http://null"
                     def publicIp = sh(script: "curl -s http://checkip.amazonaws.com", returnStdout: true).trim()
-                   def payload = [
-    project_id: params.PROJECT_ID,
-    environment_id: params.ENVIRONMENT_ID,
-    pipeline_id: env.BUILD_NUMBER,
-    version: "1.0.${env.BUILD_NUMBER}",
-    branch: "main",
-    commit_message: sh(script: "git log -1 --pretty=%B", returnStdout: true).trim(),
-    commit_author: sh(script: "git log -1 --pretty=%an", returnStdout: true).trim(),
-    public_url: "http://${publicIp}",
-    // This is the part that was failing:
-    triggered_by: [
-        username: sh(script: "git log -1 --pretty=%an", returnStdout: true).trim(),
-        source: "jenkins" // This is mandatory for your backend
-    ],
-    stages: [
-        [name: "Initialize Tracker", status: "pending"],
-        [name: "Install & Build", status: "pending"],
-        [name: "Deploy Frontend", status: "pending"]
-    ]
-]
+                    
+                    // 2. Build Payload with required "triggered_by.source"
+                    def payload = [
+                        project_id: params.PROJECT_ID,
+                        environment_id: params.ENVIRONMENT_ID,
+                        pipeline_id: env.BUILD_NUMBER,
+                        version: "1.0.${env.BUILD_NUMBER}",
+                        branch: "main",
+                        commit_message: sh(script: "git log -1 --pretty=%B", returnStdout: true).trim(),
+                        commit_author: sh(script: "git log -1 --pretty=%an", returnStdout: true).trim(),
+                        public_url: "http://${publicIp}",
+                        triggered_by: [
+                            username: sh(script: "git log -1 --pretty=%an", returnStdout: true).trim(),
+                            source: "jenkins"
+                        ],
+                        stages: [
+                            [name: "Initialize Tracker", status: "pending"],
+                            [name: "Install & Build", status: "pending"],
+                            [name: "Deploy Frontend", status: "pending"]
+                        ]
+                    ]
 
                     writeFile file: 'initial_payload.json', text: JsonOutput.toJson(payload)
                     
-                    // CRITICAL: We use returnStdout and assign specifically to env.DEPLOYMENT_ID
+                    // 3. POST and capture _id
                     def response = sh(script: "curl -s -X POST ${env.VITE_API_URL}/jenkins-webhook -H 'Content-Type: application/json' -d @initial_payload.json", returnStdout: true).trim()
-                    
-                    // This regex matches your specific JSON response format
                     env.DEPLOYMENT_ID = sh(script: "echo '${response}' | grep -oP '\"_id\":\"\\K[^\"]+' | head -1", returnStdout: true).trim()
                     
                     echo "Captured ID: ${env.DEPLOYMENT_ID}"
@@ -60,7 +59,7 @@ pipeline {
                 script {
                     notifyStage("Install & Build", "running")
                     sh 'npm install'
-                    sh 'exit 1' // This triggers the failure
+                    sh 'exit 1' // This correctly triggers the failure
                     notifyStage("Install & Build", "success")
                 }
             }
@@ -70,17 +69,10 @@ pipeline {
     post {
         failure {
             script {
-                // If the ID was captured, we send the failure notification
                 if (env.DEPLOYMENT_ID && env.DEPLOYMENT_ID != "") {
-                    echo "Sending Failure Notification for ID: ${env.DEPLOYMENT_ID}"
-                    
-                    // 1. Mark the specific stage as failed
+                    echo "Notifying Backend of Failure..."
                     notifyStage("Install & Build", "failed")
-                    
-                    // 2. Mark the whole deployment as failed
                     sh "curl -s -X PATCH ${env.VITE_API_URL}/deployments/${env.DEPLOYMENT_ID}/status -H 'Content-Type: application/json' -d '{\"status\": \"failed\"}'"
-                } else {
-                    echo "CANNOT NOTIFY BACKEND: DEPLOYMENT_ID is empty. Check Initialize Tracker stage."
                 }
             }
         }
@@ -88,9 +80,7 @@ pipeline {
 }
 
 def notifyStage(String name, String status) {
-    // Accessing env.DEPLOYMENT_ID directly
-    if (env.DEPLOYMENT_ID && en
-                    v.DEPLOYMENT_ID != "") {
+    if (env.DEPLOYMENT_ID && env.DEPLOYMENT_ID != "") {
         def stagePayload = [stageName: name, status: status]
         writeFile file: "stage_data.json", text: JsonOutput.toJson(stagePayload)
         sh "curl -s -X PATCH ${env.VITE_API_URL}/deployments/${env.DEPLOYMENT_ID}/stage -H 'Content-Type: application/json' -d @stage_data.json"
