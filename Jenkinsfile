@@ -59,7 +59,7 @@ pipeline {
                 script {
                     notifyStage("Install & Build", "running")
                     sh 'npm install'
-                    sh 'exit 1' // This correctly triggers the failure
+                    // sh 'exit 1' // This correctly triggers the failure
                     notifyStage("Install & Build", "success")
                 }
             }
