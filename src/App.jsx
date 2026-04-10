@@ -149,7 +149,7 @@ function App() {
           <h1>Nagasundharam</h1>
 
           <button className="btn btn-secondary" onClick={() => setSelectedDeployment(null)}>
-            Close Details
+            Close Detail
           </button>
         </div>
       )}
