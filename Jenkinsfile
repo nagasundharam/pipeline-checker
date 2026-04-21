@@ -82,7 +82,8 @@ pipeline {
                         echo "Executing build tasks..."
                         sh 'rm -rf node_modules package-lock.json'
                         
-                        Use --prefer-offline to save bandwidth/time
+                        // Ensure the line below has the TWO SLASHES at the start
+                        // Use --prefer-offline to save bandwidth/time
                         sh 'npm install --no-audit --no-fund --prefer-offline'
                         
                         sh 'npm run build'
