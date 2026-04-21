@@ -76,6 +76,7 @@ pipeline {
                 script {
                     notifyStage("Install & Build", "running")
                     echo "Executing build tasks..."
+                    sh 'rm -rf node_modules package-lock.json'
                     sh 'npm install'
                     sh 'npm run build'
                     notifyStage("Install & Build", "success")
