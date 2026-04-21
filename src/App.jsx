@@ -9,7 +9,7 @@ function App() {
           <h1>Welcome!</h1>
           <p className="subtitle">to Pipeline Checker</p>
           <p className="description">
-            A simple and elegant welcome page
+       and elegant welcome page
           </p>
           <div className="buttons">
             <button className="btn btn-primary">Get Started</button>
