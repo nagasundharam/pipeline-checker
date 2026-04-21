@@ -79,9 +79,15 @@ pipeline {
                     notifyStage(env.CURRENT_STAGE, "running")
                     
                     echo "Executing build tasks..."
-                    // Clean install to prevent the fdir/tinyglobby ESM module error
+                    
+                    // 1. Remove old files
                     sh 'rm -rf node_modules package-lock.json'
-                    // sh 'npm install'
+                    
+                    // 2. Install dependencies (added flags to prevent hanging/audits)
+                    // --no-audit and --no-fund speed up the process on EC2
+                    sh 'npm install --no-audit --no-fund'
+                    
+                    // 3. Build the Vite app
                     sh 'npm run build'
                     
                     notifyStage(env.CURRENT_STAGE, "success")
