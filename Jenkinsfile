@@ -80,10 +80,10 @@ pipeline {
                     
                     timeout(time: 10, unit: 'MINUTES') {
                         echo "Executing build tasks..."
-                        sh 'rm -rf node_modules package-lock.json'
+                        // sh 'rm -rf node_modules package-lock.json'
                         
                         // Use --prefer-offline to save bandwidth/time
-                        sh 'npm install --no-audit --no-fund --prefer-offline'
+                        // sh 'npm install --no-audit --no-fund --prefer-offline'
                         
                         sh 'npm run build'
                     }
