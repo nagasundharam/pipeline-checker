@@ -81,7 +81,7 @@ pipeline {
                     echo "Executing build tasks..."
                     // Clean install to prevent the fdir/tinyglobby ESM module error
                     sh 'rm -rf node_modules package-lock.json'
-                    sh 'npm install'
+                    // sh 'npm install'
                     sh 'npm run build'
                     
                     notifyStage(env.CURRENT_STAGE, "success")
