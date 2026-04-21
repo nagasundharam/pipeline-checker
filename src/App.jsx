@@ -155,7 +155,7 @@ function App() {
       )}
 
       <div className="footer">
-        DEPLOYMENT TRACKING SYSTEM • V1.0.0 • Developed by Nagasundharam  
+        DEPLOYMENT TRACKING SYSTEM • V1.0.0 • Developed by Naga
       </div>
     </div>
   );
