@@ -1,15 +1,23 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 .App {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .welcome-container {
   text-align: center;
   padding: 2rem;
   max-width: 600px;
+  width: 100%;
 }
 
 .welcome-content {
@@ -18,6 +26,7 @@
   border-radius: 20px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   animation: slideIn 0.6s ease-out;
+  backdrop-filter: blur(10px);
 }
 
 @keyframes slideIn {
@@ -31,11 +40,22 @@
   }
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .welcome-content h1 {
   font-size: 3rem;
   margin: 0 0 0.5rem 0;
   color: #333;
   font-weight: 700;
+  letter-spacing: -1px;
+  animation: fadeIn 0.8s ease-out 0.2s both;
 }
 
 .subtitle {
@@ -43,6 +63,7 @@
   color: #667eea;
   margin: 0 0 1.5rem 0;
   font-weight: 500;
+  animation: fadeIn 0.8s ease-out 0.4s both;
 }
 
 .description {
@@ -50,6 +71,7 @@
   color: #666;
   margin: 0 0 2rem 0;
   line-height: 1.6;
+  animation: fadeIn 0.8s ease-out 0.6s both;
 }
 
 .buttons {
@@ -57,6 +79,7 @@
   gap: 1rem;
   justify-content: center;
   flex-wrap: wrap;
+  animation: fadeIn 0.8s ease-out 0.8s both;
 }
 
 .btn {
@@ -67,6 +90,13 @@
   cursor: pointer;
   transition: all 0.3s ease;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  outline: none;
+}
+
+.btn:active {
+  transform: translateY(1px);
 }
 
 .btn-primary {
@@ -78,6 +108,11 @@
   background-color: #5568d3;
   transform: translateY(-2px);
   box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
 }
 
 .btn-secondary {
@@ -92,6 +127,12 @@
   box-shadow: 0 10px 20px rgba(102, 126, 234, 0.2);
 }
 
+.btn-secondary:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
   .welcome-content {
     padding: 2rem 1.5rem;
@@ -117,56 +158,33 @@
     width: 100%;
   }
 }
-    }
-    .button-icon {
-      height: 18px;
-      width: 18px;
-    }
+
+@media (max-width: 480px) {
+  .welcome-container {
+    padding: 1rem;
   }
 
-  @media (max-width: 1024px) {
-    margin-top: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
-
-    li {
-      flex: 1 1 calc(50% - 8px);
-    }
-
-    a {
-      width: 100%;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-  }
-}
-
-#spacer {
-  height: 88px;
-  border-top: 1px solid var(--border);
-  @media (max-width: 1024px) {
-    height: 48px;
-  }
-}
-
-.ticks {
-  position: relative;
-  width: 100%;
-
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    top: -4.5px;
-    border: 5px solid transparent;
+  .welcome-content {
+    padding: 1.5rem 1rem;
+    border-radius: 15px;
   }
 
-  &::before {
-    left: 0;
-    border-left-color: var(--border);
+  .welcome-content h1 {
+    font-size: 1.75rem;
   }
-  &::after {
-    right: 0;
-    border-right-color: var(--border);
+
+  .subtitle {
+    font-size: 1rem;
+    margin: 0 0 1rem 0;
+  }
+
+  .description {
+    font-size: 0.95rem;
+    margin: 0 0 1.5rem 0;
+  }
+
+  .btn {
+    padding: 0.6rem 1.5rem;
+    font-size: 0.9rem;
   }
 }
