@@ -6,11 +6,14 @@ pipeline {
         string(name: 'PROJECT_ID', defaultValue: '69ce6897557b3606c5b165ec')
         string(name: 'ENVIRONMENT_ID', defaultValue: '69ce68b3557b3606c5b165fb')
         string(name: 'EC2_HOST', defaultValue: '34.204.195.105')
+        // Initializing the local path where your web server (Nginx/Apache) serves files
+        string(name: 'DEPLOY_PATH', defaultValue: '/var/www/html')
     }
 
     environment {
         VITE_API_URL = "http://${params.EC2_HOST}:5000/api"
-        // Note: Do NOT define DEPLOYMENT_ID here to allow dynamic assignment
+        // Variable to track the current stage for accurate error reporting in 'post'
+        CURRENT_STAGE = "Initialize Tracker"
     }
 
     stages {
@@ -52,20 +55,18 @@ pipeline {
                         def response = sh(script: "curl -s -X POST ${env.VITE_API_URL}/jenkins-webhook -H 'Content-Type: application/json' -d @initial_payload.json", returnStdout: true).trim()
                         echo "API Response: ${response}"
                         
-                        // Use readJSON for robust extraction (Requires 'Pipeline Utility Steps' plugin)
                         writeFile file: 'response.json', text: response
                         def json = readJSON file: 'response.json'
                         
                         if (json.deployment && json.deployment._id) {
                             env.DEPLOYMENT_ID = json.deployment._id.toString()
                             echo "Captured ID: ${env.DEPLOYMENT_ID}"
-                            notifyStage("Initialize Tracker", "success")
+                            notifyStage(env.CURRENT_STAGE, "success")
                         } else {
                             error "Failed to initialize tracker: ${response}"
                         }
                     } catch (Exception e) {
                         echo "Tracking Error: ${e.message}"
-                        // Build proceeds but tracking may be incomplete
                     }
                 }
             }
@@ -74,12 +75,16 @@ pipeline {
         stage('Install & Build') {
             steps {
                 script {
-                    notifyStage("Install & Build", "running")
+                    env.CURRENT_STAGE = "Install & Build"
+                    notifyStage(env.CURRENT_STAGE, "running")
+                    
                     echo "Executing build tasks..."
+                    // Clean install to prevent the fdir/tinyglobby ESM module error
                     sh 'rm -rf node_modules package-lock.json'
                     sh 'npm install'
                     sh 'npm run build'
-                    notifyStage("Install & Build", "success")
+                    
+                    notifyStage(env.CURRENT_STAGE, "success")
                 }
             }
         }
@@ -87,10 +92,22 @@ pipeline {
         stage('Deploy Frontend') {
             steps {
                 script {
-                    notifyStage("Deploy Frontend", "running")
-                    echo "Deploying to production server..."
-                    // Add your deployment commands here
-                    notifyStage("Deploy Frontend", "success")
+                    env.CURRENT_STAGE = "Deploy Frontend"
+                    notifyStage(env.CURRENT_STAGE, "running")
+                    
+                    echo "Deploying Vite 'dist' files locally to ${params.DEPLOY_PATH}..."
+                    
+                    if (fileExists('dist/index.html')) {
+                        // Clear old files and copy new ones
+                        sh "sudo rm -rf ${params.DEPLOY_PATH}/*"
+                        sh "sudo cp -r dist/* ${params.DEPLOY_PATH}/"
+                        // Ensure the web server (www-data) owns the new files
+                        sh "sudo chown -R www-data:www-data ${params.DEPLOY_PATH}"
+                        
+                        notifyStage(env.CURRENT_STAGE, "success")
+                    } else {
+                        error "Build folder 'dist' not found. Deployment aborted."
+                    }
                 }
             }
         }
@@ -108,9 +125,9 @@ pipeline {
         failure {
             script {
                 if (env.DEPLOYMENT_ID) {
-                    echo "Reporting deployment failure..."
-                    // Check which stage failed and update the tracker
-                    notifyStage("Deploy Frontend", "failed") 
+                    echo "Reporting failure at stage: ${env.CURRENT_STAGE}"
+                    // Dynamically report the actual failing stage to the tracker
+                    notifyStage(env.CURRENT_STAGE, "failed") 
                     sh "curl -s -X PATCH ${env.VITE_API_URL}/deployments/${env.DEPLOYMENT_ID}/status -H 'Content-Type: application/json' -d '{\"status\": \"failed\"}'"
                 }
             }
