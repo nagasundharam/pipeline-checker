@@ -72,23 +72,21 @@ pipeline {
             }
         }
 
-        stage('Install & Build') {
+       stage('Install & Build') {
             steps {
                 script {
                     env.CURRENT_STAGE = "Install & Build"
                     notifyStage(env.CURRENT_STAGE, "running")
                     
-                    echo "Executing build tasks..."
-                    
-                    // 1. Remove old files
-                    sh 'rm -rf node_modules package-lock.json'
-                    
-                    // 2. Install dependencies (added flags to prevent hanging/audits)
-                    // --no-audit and --no-fund speed up the process on EC2
-                    sh 'npm install --no-audit --no-fund'
-                    
-                    // 3. Build the Vite app
-                    sh 'npm run build'
+                    timeout(time: 10, unit: 'MINUTES') {
+                        echo "Executing build tasks..."
+                        sh 'rm -rf node_modules package-lock.json'
+                        
+                        // Use --prefer-offline to save bandwidth/time
+                        sh 'npm install --no-audit --no-fund --prefer-offline'
+                        
+                        sh 'npm run build'
+                    }
                     
                     notifyStage(env.CURRENT_STAGE, "success")
                 }
