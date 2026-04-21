@@ -77,7 +77,7 @@ pipeline {
                     notifyStage("Install & Build", "running")
                     echo "Executing build tasks..."
                     sh 'npm install'
-                    // sh 'npm run build'
+                    sh 'npm run build'
                     notifyStage("Install & Build", "success")
                 }
             }
